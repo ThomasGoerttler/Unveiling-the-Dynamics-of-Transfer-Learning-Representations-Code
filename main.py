@@ -6,18 +6,15 @@ import torch
 import torchvision
 import torchvision.transforms as transforms
 
-import matplotlib.pyplot as plt
-import numpy as np
-
 import torch.nn as nn
 import torch.optim as optim
-from src.utils.cka import linear_CKA
 
+import numpy as np
 import wandb
 
+from src.utils.cka import linear_CKA
 from src.models.cnn import Cnn
-from src.utils.utils import resize
-
+from src.utils.utils import resize, store_array_to_wandb
 
 def test(net, dataloader):
     correct = 0
@@ -44,14 +41,6 @@ def test(net, dataloader):
 
     return 100 * correct / total, outputs, activations
 
-
-def imshow(img):
-    img = img / 2 + 0.5     # unnormalize
-    npimg = img.numpy()
-    plt.imshow(np.transpose(npimg, (1, 2, 0)))
-    plt.show()
-
-
 def analyze_activation(base_logits, logits, base_activations, activations, maxi=200):
     cka_activations = []
     for base_activation, activation in zip(base_activations, activations):
@@ -59,13 +48,6 @@ def analyze_activation(base_logits, logits, base_activations, activations, maxi=
         cka_activations.append(cka)
     cka_logits = linear_CKA(base_logits[:maxi], logits[:maxi])
     return cka_logits, cka_activations
-
-
-def store_ckas_to_wandb(wandb, ckas, base_name='TEST/pool', step=0):
-    for i, cka in enumerate(ckas):
-        wandb.log({
-            base_name + str(i + 1): cka,
-        }, step=step)
 
 if __name__=='__main__':
 
@@ -77,71 +59,138 @@ if __name__=='__main__':
     keep_prob = 0.0
     learning_rate = 0.001
     momentum = 0.9
-    epochs = 25#150
+    epochs = 100
     dataset = "cifar10"
-    seed = 4
-    finetuning = True#False
-    degree_of_randomness = 10
-    pre_train_size = 500000
+    model = "conv4"
+    seeds = [1,2,3,4,5]
+    finetuning = False
+    finetuning_size = 5000
+    degree_of_randomness = 0
+    pre_train_size = 50000
 
-    torch.manual_seed(seed)
-    np.random.seed(seed)
+    for seed in seeds:
+        torch.manual_seed(seed)
+        np.random.seed(seed)
 
-    if degree_of_randomness > 1:
-        dataset = f"{dataset} shuffle_degree: {degree_of_randomness}"
+        # Check if CUDA is available and set device
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        print(f"Using device: {device}")
 
-    trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
-    testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
-    if not finetuning and degree_of_randomness > 1: # meaning dataset
-        trainset.targets = list((np.array(trainset.targets) + np.random.randint(0, degree_of_randomness, len(trainset))) % 10)
-        testset.targets = list((np.array(testset.targets) + np.random.randint(0, degree_of_randomness, len(testset))) % 10)
+        # Additional steps to set seed for CUDA
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed(seed)
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
 
-    if pre_train_size < 50000:
-        trainset = torch.utils.data.Subset(trainset, range(0, pre_train_size))
+        if degree_of_randomness > 1:
+            dataset = f"{dataset} shuffle_degree: {degree_of_randomness}"
 
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=2)
-    testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size, shuffle=False, num_workers=2)
+        trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
+        testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
 
-    classes = ('plane', 'car', 'bird', 'cat',
-               'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+        # If degree of randomness is larger than 0 targets are randomized
+        if not finetuning and degree_of_randomness > 0:  # meaning dataset
+            trainset.targets = list(
+                (np.array(trainset.targets) + np.random.randint(0, degree_of_randomness+1, len(trainset))) % 10)
+            testset.targets = list(
+                (np.array(testset.targets) + np.random.randint(0, degree_of_randomness+1, len(testset))) % 10)
 
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        # only select subset
+        if pre_train_size < 50000:
+            trainset = torch.utils.data.Subset(trainset, range(0, pre_train_size))
 
-    wandb.init(project="CIFAR10", config= {
-        "batch_size": batch_size,
-        "keep_prob": keep_prob,
-        "learning_rate": learning_rate,
-        "momentum": momentum,
-        "epochs": epochs,
-        "dataset": dataset,
-        "finetuning": finetuning,
-        "pretrain_size": pre_train_size,
-        "degree_of_randomness": degree_of_randomness,
-        "seed": seed
-    })
+        trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=2)
+        testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size, shuffle=False, num_workers=2)
 
-    # init net with inital parameter
-    if not finetuning:
+        if finetuning:
+            name = f"{model} {dataset} {seed} fintuning with {finetuning_size} samples"
+        else:
+            name = f"{model} {dataset} {seed} training size {pre_train_size}"
 
-        net = Cnn(keep_prob=keep_prob)
+        wandb.init(project="cka_analysis", config={
+            "batch_size": batch_size,
+            "keep_prob": keep_prob,
+            "learning_rate": learning_rate,
+            "momentum": momentum,
+            "epochs": epochs,
+            "dataset": dataset,
+            "model": model,
+            "finetuning": finetuning,
+            "pretrain_size": pre_train_size,
+            "degree_of_randomness": degree_of_randomness,
+            "seed": seed
+        }, name = name)
+
+        # init net with inital parameter
+        if model == "conv4":
+            net = Cnn(keep_prob=keep_prob)
         net.to(device)
 
-        test_accuracy, base_logits, base_activations = test(net, testloader)
+        if finetuning:
+
+            # we load the learned pre-trained network
+            PATH = f'./models/{dataset}_{model}_{seed}.pth'
+            net.load_state_dict(torch.load(PATH))
+
+            # overwrite dataset
+            if dataset.startswith("SVHN"):
+                testset = torchvision.datasets.SVHN(root='./data', split="train", download=True, transform=transform)
+                if degree_of_randomness > 1:
+                    testset.labels = list(
+                        (np.array(testset.labels) + np.random.randint(0, degree_of_randomness, len(testset))) % 10)
+
+            elif dataset.startswith("cifar10 shuffle_degree"):
+
+                if degree_of_randomness > 1:
+                    testset.targets = list(
+                        (np.array(testset.targets) + np.random.randint(0, degree_of_randomness, len(testset))) % 10)
+
+            elif dataset == "cifar10_shifted":
+                testset.targets = list((np.array(testset.targets) + seed) % 10)
+
+            # use testset to prevent overlap with pretraining
+            trainset_new = torch.utils.data.Subset(testset, range(0, finetuning_size))
+            testset_new = torch.utils.data.Subset(testset, range(finetuning_size, finetuning_size*2))
+
+            trainloader = torch.utils.data.DataLoader(trainset_new, batch_size=batch_size, shuffle=True, num_workers=2)
+            testloader = torch.utils.data.DataLoader(testset_new, batch_size=batch_size, shuffle=False, num_workers=2)
+
+            # we need the pre_initialized_init_network
+            if model == "conv4":
+                pre_initialized_net = Cnn(keep_prob=keep_prob)
+            pre_initialized_net.to(device)
+            _, pre_initialized_base_logits, pre_initialized_base_activations = test(pre_initialized_net, testloader)
 
         criterion = nn.CrossEntropyLoss()
         optimizer = optim.SGD(net.parameters(), lr=learning_rate, momentum=momentum)
-
+        test_accuracy, base_logits, base_activations = test(net, testloader)
         train_accuracy, _, _ = test(net, trainloader)
+
         wandb.log({
             'TEST/accuracy': test_accuracy,
             'TRAIN/accuracy': train_accuracy,
-            'TEST/logits': 1
-        }, step = 0)
-        store_ckas_to_wandb(wandb, [1] * len(base_activations), base_name='TEST/pool', step=0) # 1 since similarity of same matrices
+            'CKAS/logits': 1
+        }, step=0)
+        store_array_to_wandb(wandb, [1] * len(base_activations), base_name='CKAS/pool',
+                             step=0)  # 1 since similarity of same matrices
 
-        for epoch in range(1, epochs+1):  # loop over the dataset multiple times
+        if finetuning:
+            # todo the next line could also be replaced with base
+            _, logits, activations = test(net, testloader)
+            pre_initialized_cka_logits, pre_initialized_cka_activations = analyze_activation(
+                pre_initialized_base_logits,
+                logits,
+                pre_initialized_base_activations,
+                activations)
+            store_array_to_wandb(wandb, pre_initialized_cka_activations, base_name='CKAS/pre_initialized_pool', step=0)
+            wandb.log({
+                'CKAS/pre_initialized_logits': pre_initialized_cka_logits
+            }, step=0)
+
+        for epoch in range(1, epochs + 1):  # loop over the dataset multiple times
 
             running_loss = []
+
             for i, data in enumerate(trainloader, 0):
 
                 # get the inputs; data is a list of [inputs, labels]
@@ -156,9 +205,12 @@ if __name__=='__main__':
 
                 # print statistics
                 running_loss.append(loss.item())
-                if i % 2000 == 0:
-                    print(f'[{epoch + 1}, {i + 1:5d}] loss: {np.mean(running_loss):.3f}')
-
+                if finetuning:
+                    print_frequence = int(finetuning_size / batch_size / 8)
+                else:
+                    print_frequence = int(pre_train_size / batch_size / 8)
+                if i % print_frequence == 0:
+                    print(f'[{epoch}, {i:5d}] loss: {np.mean(running_loss):.3f}')
 
             train_accuracy, _, _ = test(net, trainloader)
             test_accuracy, logits, activations = test(net, testloader)
@@ -168,104 +220,28 @@ if __name__=='__main__':
                 'TRAIN/loss': np.mean(running_loss),
                 'TRAIN/accuracy': train_accuracy,
                 'TEST/accuracy': test_accuracy,
-                'TEST/logits': cka_logits
-            }, step = epoch)
-
-            store_ckas_to_wandb(wandb, cka_activations, base_name = 'TEST/pool', step = epoch)
-
-
-        PATH = f'./cifar_net_{seed}.pth'
-        torch.save(net.state_dict(), PATH)
-
-    else:
-
-        PATH = f'./cifar_net_{seed}.pth'
-
-        if dataset.startswith("SVHN"):
-            testset = torchvision.datasets.SVHN(root='./data', split="train", download=True, transform=transform)
-            if degree_of_randomness > 1:
-                testset.labels = list(
-                    (np.array(testset.labels) + np.random.randint(0, degree_of_randomness, len(testset))) % 10)
-
-        elif dataset.startswith("cifar10 shuffle_degree"):
-
-            if degree_of_randomness > 1:
-                testset.targets = list(
-                    (np.array(testset.targets) + np.random.randint(0, degree_of_randomness, len(testset))) % 10)
-
-        elif dataset == "cifar10_shifted":
-            testset.targets = list((np.array(testset.targets)+seed)%10)
-
-
-
-        trainset_new = torch.utils.data.Subset(testset, range(0, 5000))
-        testset_new = torch.utils.data.Subset(testset, range(5000, 10000))
-
-        trainloader = torch.utils.data.DataLoader(trainset_new, batch_size=batch_size, shuffle=True, num_workers=2)
-        testloader = torch.utils.data.DataLoader(testset_new, batch_size=batch_size,  shuffle=False, num_workers=2)
-
-        # we need first of all the pre_init_network
-        net = Cnn(keep_prob=keep_prob)
-        net.to(device)
-        _, pre_base_logits, pre_base_activations = test(net, testloader)
-
-        # now we load the learned pretrained network
-        net = Cnn(keep_prob=keep_prob)
-        net.to(device)
-        net.load_state_dict(torch.load(PATH))
-
-        criterion = nn.CrossEntropyLoss()
-        optimizer = optim.SGD(net.parameters(), lr=learning_rate, momentum=momentum)
-        test_accuracy, base_logits, base_activations = test(net, testloader)
-        test_accuracy, logits, activations = test(net, testloader)
-        train_accuracy, _, _ = test(net, trainloader)
-
-        pre_cka_logits, pre_cka_activations = analyze_activation(pre_base_logits, logits, pre_base_activations, activations)
-
-        wandb.log({
-            'TEST/accuracy': test_accuracy,
-            'TRAIN/accuracy': train_accuracy,
-            'TEST/logits': 1,
-            'TRANSFER_TEST/pre_logits': pre_cka_logits
-        }, step=0)
-        store_ckas_to_wandb(wandb, [1] * len(base_activations), base_name='TEST/pool', step=0) # 1 since similarity of same matrices
-        store_ckas_to_wandb(wandb, pre_cka_activations, base_name='TRANSFER_TEST/pre_pool', step=0)
-
-        for epoch in range(epochs):
-
-            running_loss = []
-            for i, data in enumerate(trainloader, 0):
-                inputs, labels = data[0].to(device), data[1].to(device)
-
-                # zero the parameter gradients
-                optimizer.zero_grad()
-
-                outputs, _ = net(inputs)
-                loss = criterion(outputs, labels)
-                loss.backward()
-                optimizer.step()
-
-                # print statistics
-                running_loss.append(loss.item())
-
-                if i % 50 == 0:
-                    print(f'[{epoch + 1}, {i + 1:5d}] loss: {np.mean(running_loss):.3f}')
-
-            train_accuracy, _, _ = test(net, trainloader)
-            test_accuracy, logits, activations = test(net, testloader)
-
-            cka_logits, cka_activations = analyze_activation(base_logits, logits, base_activations, activations)
-            pre_cka_logits, cka_activations = analyze_activation(pre_base_logits, logits, pre_base_activations, activations)
-
-            wandb.log({
-                'TRAIN/loss': np.mean(running_loss),
-                'TRAIN/accuracy': train_accuracy,
-                'TEST/accuracy': test_accuracy,
-                'TEST/logits': cka_logits,
-                'TRANSFER_TEST/pre_logits': pre_cka_logits
+                'CKAS/logits': cka_logits
             }, step=epoch)
 
-            store_ckas_to_wandb(wandb, cka_activations, base_name='TEST/pool', step=epoch)
-            store_ckas_to_wandb(wandb, pre_cka_activations, base_name='TRANSFER_TEST/pre_pool', step=epoch)
+            store_array_to_wandb(wandb, cka_activations, base_name='CKAS/pool', step=epoch)
 
-        print('Finished Training')
+            if finetuning:
+                pre_initialized_cka_logits, pre_initialized_cka_activations = analyze_activation(pre_initialized_base_logits, logits,
+                                                                                 pre_initialized_base_activations,
+                                                                                 activations)
+                wandb.log({
+                    'CKAS/pre_initialized_logits': pre_initialized_cka_logits
+                }, step=epoch)
+
+                store_array_to_wandb(wandb, pre_initialized_cka_activations, base_name='CKAS/pre_initialized_pool',
+                                     step=epoch)
+
+        wandb.finish()
+        # only store if cifar10 pretrained
+        if not finetuning and dataset == "cifar10":
+            # Store model
+            PATH = f'./models/{dataset}_{model}_{seed}.pth'
+            torch.save(net.state_dict(), PATH)
+
+
+        print(f'Finished training seed {seed}')

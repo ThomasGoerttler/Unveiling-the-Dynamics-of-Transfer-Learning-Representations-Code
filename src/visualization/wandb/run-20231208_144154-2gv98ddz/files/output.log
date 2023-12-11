@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "/Users/thomas/PhD/research/code_papers/transfer_learning/cka_transfer_analysis/src/visualization/plotter_stats.py", line 19, in <module>
+    history = run.history()
+TypeError: 'History' object is not callable
