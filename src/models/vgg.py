@@ -47,7 +47,11 @@ class VGG(nn.Module):
         # Append intermediate activations after each linear layer in the classifier
         for layer in self.classifier:
             x = layer(x)
-            activations.append(x.clone())
+            if isinstance(layer, nn.ReLU):
+                activations.append(x.clone())
+
+        # also append last linear layer (which has no ReLU)
+        activations.append(x.clone())
 
         return x, activations
 
@@ -77,41 +81,41 @@ cfg = {
 }
 
 
-def vgg11():
+def Vgg11():
     """VGG 11-layer model (configuration "A")"""
     return VGG(make_layers(cfg['A']))
 
 
-def vgg11_bn():
+def Vgg11_bn():
     """VGG 11-layer model (configuration "A") with batch normalization"""
     return VGG(make_layers(cfg['A'], batch_norm=True))
 
 
-def vgg13():
+def Vgg13():
     """VGG 13-layer model (configuration "B")"""
     return VGG(make_layers(cfg['B']))
 
 
-def vgg13_bn():
+def Vgg13_bn():
     """VGG 13-layer model (configuration "B") with batch normalization"""
     return VGG(make_layers(cfg['B'], batch_norm=True))
 
 
-def vgg16():
+def Vgg16():
     """VGG 16-layer model (configuration "D")"""
     return VGG(make_layers(cfg['D']))
 
 
-def vgg16_bn():
+def Vgg16_bn():
     """VGG 16-layer model (configuration "D") with batch normalization"""
     return VGG(make_layers(cfg['D'], batch_norm=True))
 
 
-def vgg19():
+def Vgg19():
     """VGG 19-layer model (configuration "E")"""
     return VGG(make_layers(cfg['E']))
 
 
-def vgg19_bn():
+def Vgg19_bn():
     """VGG 19-layer model (configuration 'E') with batch normalization"""
     return VGG(make_layers(cfg['E'], batch_norm=True))

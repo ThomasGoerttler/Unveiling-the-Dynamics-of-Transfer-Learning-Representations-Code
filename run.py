@@ -13,11 +13,11 @@ from torchsummary import summary
 
 import numpy as np
 import wandb
-import time
 
 from src.utils.cka import linear_CKA
 from src.models.cnn import Cnn
 from src.models.resnet import ResNet18
+from src.models.vgg import Vgg16_bn
 from src.utils.utils import resize, store_array_to_wandb, parse_args, print_elapsed_time
 
 def test(net, dataloader, n_samples=0):
@@ -147,6 +147,8 @@ if __name__=='__main__':
             net = Cnn(keep_prob=keep_prob)
         elif model == "resnet18":
             net = ResNet18()
+        elif model == "vgg16":
+            net = Vgg16_bn()
         net.to(device)
 
         # Print the summary
@@ -180,6 +182,8 @@ if __name__=='__main__':
                 pre_initialized_net = Cnn(keep_prob=keep_prob)
             elif model == "resnet18":
                 pre_initialized_net = ResNet18()
+            elif model == "vgg16":
+                net = Vgg16_bn()
             pre_initialized_net.to(device)
             _, pre_initialized_base_logits, pre_initialized_base_activations = test(pre_initialized_net, testloader, n_samples)
 

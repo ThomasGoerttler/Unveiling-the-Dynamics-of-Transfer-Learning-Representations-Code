@@ -109,7 +109,7 @@ def plot_error_bar(data, attributes, config):
         plt.ylabel(config['ylabel'])
 
     plt.title(config['title'])
-    plt.savefig(f"../../img/{config['model']}_{config['title']}.pdf")
+    plt.savefig(f"img/{config['model']}_{config['title']}.pdf")
     plt.show()
 
 
@@ -133,7 +133,7 @@ def plot_error_bar_old(data, attributes, label_attribute, title, xlabel = "", yl
         plt.ylabel(ylabel)
 
     plt.title(title)
-    plt.savefig(f"../../img/{model}_{title}.pdf")
+    plt.savefig(f"img/{model}_{title}.pdf")
     plt.show()
 
 
@@ -186,11 +186,11 @@ def plot_line(data, attributes, config):
         plt.legend()
 
         if not config['same_plot']:
-            plt.savefig(f"../../img/{config['model']}_{attribute}.pdf")
+            plt.savefig(f"img/{config['model']}_{attribute}.pdf")
             plt.show()
 
     if config['same_plot']:
-        plt.savefig(f"../../img/{config['model']}_{config['title']}.pdf")
+        plt.savefig(f"img/{config['model']}_{config['title']}.pdf")
         plt.show()
 
 def plot_line_old(data, attributes, error =  "confidence_interval", same_plot = False, label = "", figsize = (8, 3.8), title = "tba", xlabel = "tba", ylabel = "tba", model=""):
@@ -242,9 +242,9 @@ def plot_line_old(data, attributes, error =  "confidence_interval", same_plot = 
         plt.legend()
 
         if not same_plot:
-            plt.savefig(f"../../img/{model}_{title}.pdf")
+            plt.savefig(f"img/{model}_{title}.pdf")
             plt.show()
 
     if same_plot:
-        plt.savefig(f"../../img/{model}_{title}.pdf")
+        plt.savefig(f"img/{model}_{title}.pdf")
         plt.show()

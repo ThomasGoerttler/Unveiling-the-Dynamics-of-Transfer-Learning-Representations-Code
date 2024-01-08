@@ -194,7 +194,14 @@ conv4_configs_list = create_plot_list(
 
 resnet18_configs_list = create_plot_list(
     'resnet18',
-    ['CKAS/pool1', 'CKAS/pool2', 'CKAS/pool3', 'CKAS/pool4', 'CKAS/pool5', 'CKAS/logits'],
-    ['CKAS/pre_initialized_pool1', 'CKAS/pre_initialized_pool2', 'CKAS/pre_initialized_pool3', 'CKAS/pre_initialized_pool4', 'CKAS/pre_initialized_pool5', 'CKAS/pre_initialized_logits'],
-    ['pool', 'block1', 'block2', 'block3', 'block4', 'logits']
+    ['CKAS/pool1', 'CKAS/pool2', 'CKAS/pool3', 'CKAS/pool4', 'CKAS/pool5', 'CKAS/pool6', 'CKAS/logits'],
+    ['CKAS/pre_initialized_pool1', 'CKAS/pre_initialized_pool2', 'CKAS/pre_initialized_pool3', 'CKAS/pre_initialized_pool4', 'CKAS/pre_initialized_pool5', 'CKAS/pre_initialized_pool6', 'CKAS/pre_initialized_logits'],
+    ['pool', 'block1', 'block2', 'block3', 'block4', 'same', 'logits']
+)
+
+vgg16_configs_list = create_plot_list(
+    'vgg16',
+    ['CKAS/pool1', 'CKAS/pool2', 'CKAS/pool3', 'CKAS/pool4', 'CKAS/pool5', 'CKAS/pool6', 'CKAS/logits'],
+    ['CKAS/pre_initialized_pool1', 'CKAS/pre_initialized_pool2', 'CKAS/pre_initialized_pool3', 'CKAS/pre_initialized_pool4', 'CKAS/pre_initialized_pool5', 'CKAS/pre_initialized_pool6', 'CKAS/pre_initialized_logits'],
+    ['pool', 'block1', 'block2', 'block3', 'block4', 'same', 'logits']
 )
