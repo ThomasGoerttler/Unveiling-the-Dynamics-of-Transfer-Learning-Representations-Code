@@ -1,0 +1,3 @@
+python main.py train_resnet18_cifar10
+python main.py train_resnet18_on_cifar10_subset
+python main.py finetune_resnet18_on_cifar10

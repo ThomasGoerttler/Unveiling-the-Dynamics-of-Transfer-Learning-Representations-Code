@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-data = pd.read_csv('../../csvs/stats.csv')
-data = pd.read_csv('../../csvs/first_exp.csv')
+data = pd.read_csv('../csvs/stats.csv')
+data = pd.read_csv('../csvs/first_exp.csv')
 
 
 figsize = (8,3.8)

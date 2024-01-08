@@ -12,16 +12,16 @@ colnames = ["x1", "x2", "x3", "x4", "logits"]
 colnames = ["pool1", "pool2", "pool3", "pool4", "logits"]
 
 #data = pd.read_csv('csvs/new_exp.csv')
-data = pd.read_csv('../../csvs/transfer_all.csv')
-data = pd.read_csv('../../csvs/comp_init_pretrained.csv')
-data = pd.read_csv('../../csvs/pretraining_random.csv')
-data = pd.read_csv('../../csvs/training_size.csv')
+data = pd.read_csv('../csvs/transfer_all.csv')
+data = pd.read_csv('../csvs/comp_init_pretrained.csv')
+data = pd.read_csv('../csvs/pretraining_random.csv')
+data = pd.read_csv('../csvs/training_size.csv')
 #data = pd.read_csv('csvs/comp_init_pretrained.csv')
 
 
 group = "dataset"
 group = "d"
-group = "pretrain_size"
+group = "pre_trained_size"
 pre = False
 figsize = (4,4)
 title = "Similarity of (cross-)domain task"

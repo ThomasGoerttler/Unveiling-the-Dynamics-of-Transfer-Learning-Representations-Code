@@ -1,0 +1,3 @@
+python main.py train_conv4_cifar10
+python main.py train_conv4_on_cifar10_subset
+python main.py finetune_conv4_on_cifar10

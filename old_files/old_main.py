@@ -102,7 +102,7 @@ if __name__=='__main__':
     seed = 3
     finetuning = True
     degree_of_randomness = 1
-    pre_train_size = 500000
+    pre_trained_size = 500000
 
     torch.manual_seed(seed)
     np.random.seed(seed)
@@ -129,8 +129,8 @@ if __name__=='__main__':
         trainset.targets = list((np.array(trainset.targets) + np.random.randint(0, degree_of_randomness, len(trainset))) % 10)
         testset.targets = list((np.array(testset.targets) + np.random.randint(0, degree_of_randomness, len(testset))) % 10)
 
-    if pre_train_size < 50000:
-        trainset = torch.utils.data.Subset(trainset, range(0, pre_train_size))
+    if pre_trained_size < 50000:
+        trainset = torch.utils.data.Subset(trainset, range(0, pre_trained_size))
 
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size,
                                               shuffle=True, num_workers=2)
@@ -149,7 +149,7 @@ if __name__=='__main__':
         "epochs": epochs,
         "dataset": dataset,
         "finetuning": finetuning,
-        "pretrain_size": pre_train_size,
+        "pre_trained_size": pre_trained_size,
         "degree_of_randomness": degree_of_randomness,
         "seed": seed
     })
