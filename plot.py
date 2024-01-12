@@ -1,10 +1,10 @@
 from src.utils.plotting_utils import *
-from configs.plot_config import conv4_configs_list, resnet18_configs_list
+from configs.plot_config import *
 
 old_filters = dict()
 old_history = ""
 
-for config in resnet18_configs_list:#conv4_configs_list+resnet18_configs_list:
+for config in resnet18_configs_list_imagenet:#conv4_configs_list + vgg16_configs_list + resnet18_configs_list:# + conv4_configs_list+resnet18_configs_list:
     # do not  load data if same as before
     if old_filters != config['filters'] or old_history != config['history']:
         data = load_data(filters=config['filters'], history=config['history'])

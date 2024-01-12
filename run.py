@@ -17,8 +17,10 @@ import wandb
 from src.utils.cka import linear_CKA
 from src.models.cnn import Cnn
 from src.models.resnet import ResNet18
-from src.models.vgg import Vgg16_bn
-from src.utils.utils import resize, store_array_to_wandb, parse_args, print_elapsed_time
+from src.models.resnet_new import get_resnet18
+from src.models.vgg import Vgg
+from src.models.alexnet import AlexNet
+from src.utils.utils import resize, store_array_to_wandb, parse_args, print_elapsed_time, load_partial_state_dict
 
 def test(net, dataloader, n_samples=0):
     correct = 0
@@ -33,7 +35,6 @@ def test(net, dataloader, n_samples=0):
             outs, acts = net(inputs)
 
             if n_samples > 0:
-                outputs.append(torch.flatten(outs[:, :n_samples], 1).cpu().detach().numpy())
                 activations.append(
                     [torch.flatten(activation[:, :n_samples], 1).cpu().detach().numpy() for activation in acts])
 
@@ -43,18 +44,29 @@ def test(net, dataloader, n_samples=0):
             correct += (predicted == labels).sum().item()
 
         if n_samples > 0:
-            outputs = resize(outputs)
             activations = [resize(activation) for activation in zip(*activations)]
 
-    return 100 * correct / total, outputs, activations
+    return 100 * correct / total, activations
 
-def analyze_activation(base_logits, logits, base_activations, activations, n_samples=500):
+def analyze_activation(base_activations, activations, n_samples=500):
     cka_activations = []
     for base_activation, activation in zip(base_activations, activations):
         cka = linear_CKA(base_activation[:n_samples], activation[:n_samples])
         cka_activations.append(cka)
-    cka_logits = linear_CKA(base_logits[:n_samples], logits[:n_samples])
-    return cka_logits, cka_activations
+    return cka_activations
+
+def get_model(model, keep_prob = 0, num_classes = 10):
+    if model == "conv4":
+        net = Cnn(keep_prob=keep_prob, num_classes=num_classes)
+    elif model == "resnet18":
+
+        net = ResNet18(num_classes=num_classes)
+    elif model == "vgg16":
+        net = Vgg(size=16, batch_norm=True, num_classes=num_classes)
+    elif model == "alexnet":
+        net = AlexNet(num_classes=num_classes, small = True)
+    return net
+
 
 if __name__=='__main__':
 
@@ -87,6 +99,13 @@ if __name__=='__main__':
     else:
         pre_trained_dataset = ""
         finetuning_size = -1
+
+    if dataset.startswith("cifar10") or dataset.startswith("SVHN"):
+        num_classes = 10
+    elif dataset.startswith(("imagenet")):
+        num_classes = 1000
+    else:
+        num_classes = -1
         
     for seed in seeds:
 
@@ -143,22 +162,38 @@ if __name__=='__main__':
         }, name = name)
 
         # init net with inital parameter
-        if model == "conv4":
-            net = Cnn(keep_prob=keep_prob)
-        elif model == "resnet18":
-            net = ResNet18()
-        elif model == "vgg16":
-            net = Vgg16_bn()
+        net = get_model(model, keep_prob, num_classes)
         net.to(device)
 
         # Print the summary
-        summary(net, (3, 32, 32))  # Assuming input size is (3, 32, 32)
-        n_samples = 500
+        if num_classes == 10:
+            summary(net, (3, 32, 32))  # Assuming input size is (3, 32, 32)
+        elif num_classes == 1000:
+            summary(net, (3, 224, 224))
+
+        n_samples = 2
         if finetuning:
 
             # we load the learned pre-trained network
-            PATH = f'./models/{pre_trained_dataset}_{model}_{seed}.pth'
-            net.load_state_dict(torch.load(PATH))
+            if pre_trained_dataset == "imagenet":
+
+                if model == "conv4":
+                    print("No imagenet trained wegihts available")
+                if model == "resnet18":
+                    from torchvision.models.resnet import ResNet18_Weights
+                    weights = ResNet18_Weights.IMAGENET1K_V1.get_state_dict(progress=True)
+                    exclude_layer = "fc"
+                elif model == "vgg16":
+                    from torchvision.models.vgg import VGG16_BN_Weights
+                    weights = VGG16_BN_Weights.IMAGENET1K_V1.get_state_dict(progress=True)
+                    exclude_layer = "classifier"
+                elif model == "alexnet":
+                    print("No imagenet trained wegihts available yet")
+                # Do not load fc layers
+                load_partial_state_dict(net, weights, exclude_layer=exclude_layer)
+            else:
+                PATH = f'./models/{pre_trained_dataset}_{model}_{seed}.pth'
+                net.load_state_dict(torch.load(PATH))
 
             # overwrite dataset
             if dataset.startswith("SVHN"):
@@ -166,6 +201,22 @@ if __name__=='__main__':
                 if degree_of_randomness > 0:
                     testset.labels = list(
                         (np.array(testset.labels) + np.random.randint(0, degree_of_randomness + 1, len(testset))) % 10)
+
+            elif dataset.startswith("imagenet"):
+
+                # For validation and testing
+                val_transform = transforms.Compose([
+                    transforms.Resize(256),
+                    transforms.CenterCrop(224),
+                    transforms.ToTensor(),
+                    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+                ])
+
+                # Use only the validation part of ImageNet, since it is smaller
+                testset = torchvision.datasets.ImageNet(root='./data', split='val', transform=val_transform)
+                if degree_of_randomness > 0:
+                    testset.labels = list(
+                        (np.array(testset.labels) + np.random.randint(0, degree_of_randomness + 1, len(testset))) % 1000)
 
             elif dataset == "cifar10_shifted":
                 testset.targets = list((np.array(testset.targets) + seed) % 10)
@@ -178,47 +229,36 @@ if __name__=='__main__':
             testloader = torch.utils.data.DataLoader(testset_new, batch_size=batch_size, shuffle=False, num_workers=2)
 
             # we need the pre_initialized_init_network
-            if model == "conv4":
-                pre_initialized_net = Cnn(keep_prob=keep_prob)
-            elif model == "resnet18":
-                pre_initialized_net = ResNet18()
-            elif model == "vgg16":
-                net = Vgg16_bn()
+            pre_initialized_net = get_model(model, keep_prob, num_classes)
             pre_initialized_net.to(device)
-            _, pre_initialized_base_logits, pre_initialized_base_activations = test(pre_initialized_net, testloader, n_samples)
+            _, pre_initialized_base_activations = test(pre_initialized_net, testloader, n_samples)
 
         criterion = nn.CrossEntropyLoss()
         optimizer = optim.SGD(net.parameters(), lr=learning_rate, momentum=momentum)
         since = print_elapsed_time("Setup", since)
-        train_accuracy, _, _ = test(net, trainloader, )
+        train_accuracy, _ = test(net, trainloader)
         since = print_elapsed_time("Train accuracy", since)
-        test_accuracy, base_logits, base_activations = test(net, testloader, n_samples)
+        test_accuracy, base_activations = test(net, testloader, n_samples)
         since = print_elapsed_time("Test accuracy", since)
 
         wandb.log({
             'TEST/accuracy': test_accuracy,
-            'TRAIN/accuracy': train_accuracy,
-            'CKAS/logits': 1
+            'TRAIN/accuracy': train_accuracy
         }, step=0)
-        store_array_to_wandb(wandb, [1] * len(base_activations), base_name='CKAS/pool',
+        store_array_to_wandb(wandb, [1] * len(base_activations), base_name='CKAS/layer',
                              step=0)  # 1 since similarity of same matrices
 
         if finetuning:
             # todo the next line could also be replaced with base
-            _, logits, activations = test(net, testloader, n_samples)
+            _, activations = test(net, testloader, n_samples)
 
             since = print_elapsed_time("Test activations", since)
-            pre_initialized_cka_logits, pre_initialized_cka_activations = analyze_activation(
-                pre_initialized_base_logits,
-                logits,
+            pre_initialized_cka_activations = analyze_activation(
                 pre_initialized_base_activations,
                 activations,
                 n_samples)
             since = print_elapsed_time("CKA analysis (pre)", since)
-            store_array_to_wandb(wandb, pre_initialized_cka_activations, base_name='CKAS/pre_initialized_pool', step=0)
-            wandb.log({
-                'CKAS/pre_initialized_logits': pre_initialized_cka_logits
-            }, step=0)
+            store_array_to_wandb(wandb, pre_initialized_cka_activations, base_name='CKAS/pre_initialized_layer', step=0)
 
         for epoch in range(1, epochs + 1):  # loop over the dataset multiple times
 
@@ -247,32 +287,27 @@ if __name__=='__main__':
                     print(f'[{epoch}, {(i+1):5d}] loss: {np.mean(running_loss):.3f}')
 
             since = print_elapsed_time(f"Train {epoch} epoch", since)
-            train_accuracy, _, _ = test(net, trainloader, )
+            train_accuracy, _ = test(net, trainloader, )
             since = print_elapsed_time("Train accuracy", since)
-            test_accuracy, logits, activations = test(net, testloader, n_samples)
+            test_accuracy, activations = test(net, testloader, n_samples)
             since = print_elapsed_time("Test accuracy", since)
-            cka_logits, cka_activations = analyze_activation(base_logits, logits, base_activations, activations, n_samples)
+            cka_activations = analyze_activation(base_activations, activations, n_samples)
             since = print_elapsed_time("CKA analysis", since)
 
             wandb.log({
                 'TRAIN/loss': np.mean(running_loss),
                 'TRAIN/accuracy': train_accuracy,
-                'TEST/accuracy': test_accuracy,
-                'CKAS/logits': cka_logits
+                'TEST/accuracy': test_accuracy
             }, step=epoch)
 
-            store_array_to_wandb(wandb, cka_activations, base_name='CKAS/pool', step=epoch)
+            store_array_to_wandb(wandb, cka_activations, base_name='CKAS/layer', step=epoch)
 
             if finetuning:
-                pre_initialized_cka_logits, pre_initialized_cka_activations = analyze_activation(pre_initialized_base_logits, logits,
-                                                                                 pre_initialized_base_activations,
+                pre_initialized_cka_activations = analyze_activation(pre_initialized_base_activations,
                                                                                  activations, n_samples)
                 since = print_elapsed_time("CKA analysis (pre)", since)
-                wandb.log({
-                    'CKAS/pre_initialized_logits': pre_initialized_cka_logits
-                }, step=epoch)
 
-                store_array_to_wandb(wandb, pre_initialized_cka_activations, base_name='CKAS/pre_initialized_pool',
+                store_array_to_wandb(wandb, pre_initialized_cka_activations, base_name='CKAS/pre_initialized_layer',
                                      step=epoch)
 
         wandb.finish()

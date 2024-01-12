@@ -35,6 +35,13 @@ def parse_args():
 def get_standard_error(std, sample_size):
     return std/np.sqrt(sample_size)
 
+
+def load_partial_state_dict(model, pretrained_state_dict, exclude_layer='fc'):
+    model_dict = model.state_dict()
+    pretrained_dict = {k: v for k, v in pretrained_state_dict.items() if exclude_layer not in k}
+
+    model_dict.update(pretrained_dict)
+    model.load_state_dict(model_dict)
 def get_confidence_interval(std, sample_size, confidence=95):
     if confidence == 90:
         multiplier = 1.645

@@ -50,6 +50,14 @@ class BasicBlock(nn.Module):
         out = self.relu(out)
         return  out
 
+def return_weights(conv1):
+    # Access the initialized weights
+    initialized_weights = conv1.weight.data
+
+    # Calculate mean and standard deviation
+    mean_value = initialized_weights.mean().item()
+    std_value = initialized_weights.std().item()
+    return mean_value, std_value
 
 class ResNet18(nn.Module):
     def __init__(
@@ -78,6 +86,14 @@ class ResNet18(nn.Module):
             padding=3,
             bias=False
         )
+        s = return_weights(self.conv1)
+        import torch.nn.init as init
+        init.kaiming_normal_(self.conv1.weight)
+        s = return_weights(self.conv1)
+        init.kaiming_normal_(self.conv1.weight, mode='fan_out', nonlinearity='leaky_relu')
+        s = return_weights(self.conv1)
+        init.kaiming_normal_(self.conv1.weight, mode='fan_out', nonlinearity='relu')
+        s = return_weights(self.conv1)
         self.bn1 = nn.BatchNorm2d(self.in_channels)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)

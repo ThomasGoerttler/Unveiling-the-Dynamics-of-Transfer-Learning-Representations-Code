@@ -1,6 +1,6 @@
 config_list = []
 
-for value in [4, 9]:
+for size in [64, 256, 1024, 4096]:
     config = {
         "batch_size": 32,
         "keep_prob": 0.0,
@@ -8,10 +8,10 @@ for value in [4, 9]:
         "momentum": 0.9,
         "epochs": 50,
         "dataset": "cifar10",
-        "model": "resnet18",
+        "model": "vgg16",
         "seeds": [1, 2, 3, 4, 5],
-        "degree_of_randomness": value,
-        "pre_trained_size": 50000
+        "degree_of_randomness": 0,
+        "pre_trained_size": size
     }
     config_list.append(config)
 
