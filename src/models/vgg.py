@@ -21,12 +21,12 @@ class VGG(nn.Module):
         if num_classes == 1000:
             self.classifier = nn.Sequential(
                 nn.Dropout(),
-                nn.Linear(512 * 7 * 7, 16),
+                nn.Linear(512 * 7 * 7, 512),
                 nn.ReLU(True),
                 nn.Dropout(),
-                nn.Linear(16, 16),
+                nn.Linear(512, 512),
                 nn.ReLU(True),
-                nn.Linear(16, num_classes),
+                nn.Linear(512, num_classes),
             )
         # for cifar10 and SVHN
         elif num_classes == 10:

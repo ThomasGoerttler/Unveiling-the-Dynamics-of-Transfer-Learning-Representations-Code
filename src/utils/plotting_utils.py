@@ -3,7 +3,9 @@ import matplotlib.pyplot as plt
 import wandb
 import numpy as np
 
-from src.utils.utils import get_standard_error, get_confidence_interval, to_int_if_int
+from src.utils.utils import get_standard_error, get_confidence_interval, to_int_if_int, replace_spaces_with_underscore
+
+
 
 def check_conditions(filters, run):
     for key, value in filters.items():
@@ -89,6 +91,36 @@ def aggregate(data, groupby, columns_of_interest, new_column_name = []):
             print("Columns cannot be renamed since length is not the same")
     return(grouped_df)
 
+def plot_multiple_error_bar(datas, attributes, config):
+    fig = plt.figure(figsize=config['figsize'])
+    colors = plt.cm.jet(np.linspace(0.7, 0.95, len(datas[0])))
+    x_ticks_positions = []
+    for j, data in enumerate(datas):
+
+        x_ticks_positions.append((len(attributes)-1)/2 + len(attributes) * j)
+        for i, row in data.iterrows():
+
+            means = [row[attribute] for attribute in attributes]
+            errors = [row[attribute + " std"] / np.sqrt(row[attribute + " count"]) for attribute in attributes]
+            label = to_int_if_int(row[config['label_attribute']])
+            plt.errorbar([a+str(j) for a in attributes], means, yerr=errors, label=label, color=colors[i])
+
+        if j == 0:
+            plt.legend(loc='lower left')
+
+    plt.xticks(x_ticks_positions, config["xticks"])
+    if config['xlabel'] != "":
+        plt.xlabel(config['xlabel'])
+    if config['ylabel'] != "":
+        plt.ylabel(config['ylabel'])
+
+    plt.title(config['title'])
+    if 'subtitle' in config.keys():
+        plt.suptitle(config['subtitle'])
+        plt.savefig(replace_spaces_with_underscore(f"img/{config['subtitle']} {config['title']}.pdf"))
+    else:
+        plt.savefig(replace_spaces_with_underscore(f"img/{config['model']} {config['title']}.pdf"))
+    plt.show()
 
 def plot_error_bar(data, attributes, config):
     fig = plt.figure(figsize=config['figsize'])
@@ -109,31 +141,11 @@ def plot_error_bar(data, attributes, config):
         plt.ylabel(config['ylabel'])
 
     plt.title(config['title'])
-    plt.savefig(f"img/{config['model']}_{config['title']}.pdf")
-    plt.show()
-
-
-def plot_error_bar_old(data, attributes, label_attribute, title, xlabel = "", ylabel = "", model="", figsize = (4, 4)):
-
-    fig = plt.figure(figsize=figsize)
-    colors = plt.cm.jet(np.linspace(0.7, 0.95, len(data)))
-
-    for i, row in data.iterrows():
-
-        means = [row[attribute] for attribute in attributes]
-        errors = [row[attribute + " std"] / np.sqrt(row[attribute + " count"]) for attribute in attributes]
-        label = to_int_if_int(row[label_attribute])
-        plt.errorbar(attributes, means, yerr=errors, label=label, color=colors[i])
-
-        plt.legend(loc='lower left')
-
-    if xlabel != "":
-        plt.xlabel(xlabel)
-    if ylabel != "":
-        plt.ylabel(ylabel)
-
-    plt.title(title)
-    plt.savefig(f"img/{model}_{title}.pdf")
+    if 'subtitle' in config.keys():
+        plt.suptitle(config['subtitle'])
+        plt.savefig(replace_spaces_with_underscore(f"img/{config['subtitle']} {config['title']}.pdf"))
+    else:
+        plt.savefig(replace_spaces_with_underscore(f"img/{config['model']} {config['title']}.pdf"))
     plt.show()
 
 
@@ -151,8 +163,8 @@ def plot_line(data, attributes, config):
             plt.figure(figsize=config['figsize'])
             plt.xlabel(config['xlabel'])
             plt.ylabel(config['ylabel'])
-            titel = attribute
-            plt.title(titel)
+            title = attribute
+            plt.title(title)
 
         if config['label'] != "":
             label_values = data[config['label']].unique()
@@ -186,65 +198,9 @@ def plot_line(data, attributes, config):
         plt.legend()
 
         if not config['same_plot']:
-            plt.savefig(f"img/{config['model']}_{attribute}.pdf")
+            plt.savefig(replace_spaces_with_underscore(f"img/{config['subtitle']} {attribute}.pdf"))
             plt.show()
 
     if config['same_plot']:
-        plt.savefig(f"img/{config['model']}_{config['title']}.pdf")
-        plt.show()
-
-def plot_line_old(data, attributes, error =  "confidence_interval", same_plot = False, label = "", figsize = (8, 3.8), title = "tba", xlabel = "tba", ylabel = "tba", model=""):
-
-    if same_plot:
-        plt.figure(figsize=figsize)
-        plt.xlabel(xlabel)
-        plt.ylabel(ylabel)
-        plt.title(title)
-
-    for attribute in attributes:
-
-        if not same_plot:
-            plt.figure(figsize=figsize)
-            plt.xlabel(xlabel)
-            plt.ylabel(attribute)
-            titel = attribute
-            plt.title(titel)
-
-        if label != "":
-            label_values = data[label].unique()
-            datasets = [data[data[label] == value] for value in label_values]
-        else:
-            datasets = [data]
-            label_values = [attribute]
-
-        for dataset, label_value in zip(datasets, label_values):
-            plt.plot(dataset[attribute], label = label_value)
-
-            lower_bound = None
-            upper_bound = None
-
-            if error == "std":
-                lower_bound = dataset[attribute] - dataset[f'{attribute} std']
-                upper_bound = dataset[attribute] + dataset[f'{attribute} std']
-            elif error == "ste":
-                se = get_standard_error(dataset[f'{attribute} std'], dataset[f'{attribute} count'])
-                lower_bound = dataset[attribute] - se
-                upper_bound = dataset[attribute] + se
-            elif error == "confidence_interval":
-                ci = get_confidence_interval(dataset[f'{attribute} std'], dataset[f'{attribute} count'])
-                lower_bound = dataset[attribute] - ci
-                upper_bound = dataset[attribute] + ci
-
-            if lower_bound is not None and upper_bound is not None:
-                plt.fill_between(dataset.index, lower_bound, upper_bound, alpha=0.3)#, label=f'{attribute} {error}')
-
-        plt.ylim(bottom=0)
-        plt.legend()
-
-        if not same_plot:
-            plt.savefig(f"img/{model}_{title}.pdf")
-            plt.show()
-
-    if same_plot:
-        plt.savefig(f"img/{model}_{title}.pdf")
+        plt.savefig(replace_spaces_with_underscore(f"img/{config['subtitle']} {config['title']}.pdf"))
         plt.show()

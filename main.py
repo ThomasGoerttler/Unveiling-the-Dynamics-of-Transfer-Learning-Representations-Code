@@ -52,5 +52,5 @@ if __name__ == "__main__":
     commands = generate_commands(commands_configs)
 
     # Use ThreadPoolExecutor to run commands in parallel
-    with ThreadPoolExecutor(max_workers=5) as executor:
+    with ThreadPoolExecutor(max_workers=1) as executor:
         executor.map(run_command, commands)

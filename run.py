@@ -44,7 +44,13 @@ def test(net, dataloader, n_samples=0):
             correct += (predicted == labels).sum().item()
 
         if n_samples > 0:
-            activations = [resize(activation) for activation in zip(*activations)]
+            # todo clarify
+            #activations = [resize(activation) for activation in zip(*activations)]
+            resized_activations = []
+            for activation in zip(*activations):
+                resized_activation = resize(activation)
+                resized_activations.append(resized_activation)
+            activations = resized_activations
 
     return 100 * correct / total, activations
 
@@ -168,10 +174,11 @@ if __name__=='__main__':
         # Print the summary
         if num_classes == 10:
             summary(net, (3, 32, 32))  # Assuming input size is (3, 32, 32)
+            n_samples = 500
         elif num_classes == 1000:
             summary(net, (3, 224, 224))
+            n_samples = 100
 
-        n_samples = 2
         if finetuning:
 
             # we load the learned pre-trained network
@@ -193,7 +200,14 @@ if __name__=='__main__':
                 load_partial_state_dict(net, weights, exclude_layer=exclude_layer)
             else:
                 PATH = f'./models/{pre_trained_dataset}_{model}_{seed}.pth'
-                net.load_state_dict(torch.load(PATH))
+                try:
+                    net.load_state_dict(torch.load(PATH))
+                except:
+                    if model == "resnet18":
+                        exclude_layer = "fc"
+                    elif model == "vgg16":
+                        exclude_layer = "classifier"
+                    load_partial_state_dict(net, torch.load(PATH), exclude_layer=exclude_layer)
 
             # overwrite dataset
             if dataset.startswith("SVHN"):
@@ -215,8 +229,8 @@ if __name__=='__main__':
                 # Use only the validation part of ImageNet, since it is smaller
                 testset = torchvision.datasets.ImageNet(root='./data', split='val', transform=val_transform)
                 if degree_of_randomness > 0:
-                    testset.labels = list(
-                        (np.array(testset.labels) + np.random.randint(0, degree_of_randomness + 1, len(testset))) % 1000)
+                    testset.targets = list(
+                        (np.array(testset.targets) + np.random.randint(0, degree_of_randomness + 1, len(testset))) % 1000)
 
             elif dataset == "cifar10_shifted":
                 testset.targets = list((np.array(testset.targets) + seed) % 10)
@@ -236,7 +250,7 @@ if __name__=='__main__':
         criterion = nn.CrossEntropyLoss()
         optimizer = optim.SGD(net.parameters(), lr=learning_rate, momentum=momentum)
         since = print_elapsed_time("Setup", since)
-        train_accuracy, _ = test(net, trainloader)
+        train_accuracy, _ = test(net, trainloader )
         since = print_elapsed_time("Train accuracy", since)
         test_accuracy, base_activations = test(net, testloader, n_samples)
         since = print_elapsed_time("Test accuracy", since)

@@ -1,7 +1,7 @@
 config_list = []
 
-#for dataset in ["cifar10", "SVHN", "cifar10_shifted"]:
-for dataset in ["imagenet"]:
+for dataset in ["cifar10", "SVHN", "cifar10_shifted", "imagenet"]:
+
     for degree in [0, 1, 2, 4, 9]:
         # for shifted we do not iterated the degree
         if dataset == "cifar10_shifted" and degree > 0:

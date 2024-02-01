@@ -11,7 +11,8 @@ def store_array_to_wandb(wandb, array, base_name='TEST/pool', step=0):
         wandb.log({
             base_name + str(i + 1): value,
         }, step=step)
-
+def replace_spaces_with_underscore(text):
+    return text.replace(" ", "_")
 def parse_args():
     parser = argparse.ArgumentParser(description="Your script description")
 

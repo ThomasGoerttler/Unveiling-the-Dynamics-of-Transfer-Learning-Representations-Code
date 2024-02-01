@@ -18,7 +18,7 @@ for model in ['resnet18']:
     columns_of_interest = ['CKAS/pool1', 'CKAS/pool2', 'CKAS/pool3', 'CKAS/pool4', 'CKAS/logits']
     attributes = ['pool1', 'pool2', 'pool3', 'pool4', 'logits']
     grouped_df = aggregate(data, groupby = ["pre_trained_size"], columns_of_interest = columns_of_interest, new_column_name = attributes)
-    plot_error_bar_old(grouped_df, attributes, "pre_trained_size", title ="Similarity with changing size of training data", xlabel = "Layer", ylabel = "CKA", model = model)
+    plot_error_bar(grouped_df, attributes, "pre_trained_size", title ="Similarity with changing size of training data", xlabel = "Layer", ylabel = "CKA", model = model)
 
 
 
